@@ -64,10 +64,9 @@ namespace Microsoft.Azure.WebJobs.Script.Tests.Security
         }
 
         [Fact]
-        public void TryGetSecretsRepositoryType_ReturnsExpectedValue()
+        public void GetSecretsRepositoryType_ReturnsExpectedValue()
         {
-            bool result = _provider.TryGetSecretsRepositoryType(out Type repositoryType);
-            Assert.True(result);
+            var repositoryType = _provider.GetSecretsRepositoryType();
             Assert.Equal(typeof(BlobStorageSecretsRepository), repositoryType);
         }
 

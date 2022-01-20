@@ -14,7 +14,10 @@ using System.Xml;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.TestHost;
+using Microsoft.Azure.Web.DataProtection;
 using Microsoft.Azure.WebJobs.Host.Executors;
+using Microsoft.Azure.WebJobs.Script;
+using Microsoft.Azure.WebJobs.Script.Config;
 using Microsoft.Azure.WebJobs.Script.ExtensionBundle;
 using Microsoft.Azure.WebJobs.Script.Grpc;
 using Microsoft.Azure.WebJobs.Script.Models;
@@ -32,6 +35,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
+using Microsoft.Net.Http.Headers;
 using Microsoft.WebJobs.Script.Tests;
 using Newtonsoft.Json.Linq;
 using IApplicationLifetime = Microsoft.AspNetCore.Hosting.IApplicationLifetime;
@@ -59,9 +63,10 @@ namespace Microsoft.Azure.WebJobs.Script.Tests
            Action<IWebJobsBuilder> configureScriptHostWebJobsBuilder = null,
            Action<IConfigurationBuilder> configureScriptHostAppConfiguration = null,
            Action<ILoggingBuilder> configureScriptHostLogging = null,
-           Action<IServiceCollection> configureScriptHostServices = null)
+           Action<IServiceCollection> configureScriptHostServices = null,
+           Action<IConfigurationBuilder> configureWebHostAppConfiguration = null)
             : this(scriptPath, Path.Combine(Path.GetTempPath(), @"Functions"), configureWebHostServices, configureScriptHostWebJobsBuilder,
-                  configureScriptHostAppConfiguration, configureScriptHostLogging, configureScriptHostServices)
+                  configureScriptHostAppConfiguration, configureScriptHostLogging, configureScriptHostServices, configureWebHostAppConfiguration)
         {
         }
 
@@ -70,7 +75,8 @@ namespace Microsoft.Azure.WebJobs.Script.Tests
             Action<IWebJobsBuilder> configureScriptHostWebJobsBuilder = null,
             Action<IConfigurationBuilder> configureScriptHostAppConfiguration = null,
             Action<ILoggingBuilder> configureScriptHostLogging = null,
-            Action<IServiceCollection> configureScriptHostServices = null)
+            Action<IServiceCollection> configureScriptHostServices = null,
+            Action<IConfigurationBuilder> configureWebHostAppConfiguration = null)
         {
             _appRoot = scriptPath;
 
@@ -147,6 +153,7 @@ namespace Microsoft.Azure.WebJobs.Script.Tests
 
                     config.Add(new ScriptEnvironmentVariablesConfigurationSource());
                     config.AddTestSettings();
+                    configureWebHostAppConfiguration?.Invoke(config);
                 })
                 .UseStartup<TestStartup>();
 
@@ -345,8 +352,25 @@ namespace Microsoft.Azure.WebJobs.Script.Tests
 
         public async Task<HostStatus> GetHostStatusAsync()
         {
-            HostSecretsInfo secrets = await SecretManager.GetHostSecretsAsync();
-            string uri = $"admin/host/status?code={secrets.MasterKey}";
+            var secretManagerProvider = _testServer.Host.Services.GetService<ISecretManagerProvider>();
+            string uri = "admin/host/status";
+            if (secretManagerProvider != null && secretManagerProvider.SecretsEnabled)
+            {
+                HostSecretsInfo secrets = await SecretManager.GetHostSecretsAsync();
+                uri = uri + $"?code={secrets.MasterKey}";
+
+            }
+            else
+            {
+                // use bearer token auth
+                var key = Util.GetDefaultKeyValue();
+                var issuer = string.Format(ScriptConstants.AdminJwtValidIssuerFormat, ScriptSettingsManager.Instance.GetSetting(EnvironmentSettingNames.AzureWebsiteName));
+                var audience = string.Format(ScriptConstants.AdminJwtValidAudienceFormat, ScriptSettingsManager.Instance.GetSetting(EnvironmentSettingNames.AzureWebsiteName));
+                var token = JwtGenerator.GenerateToken(issuer, audience, key: key);
+
+                HttpClient.DefaultRequestHeaders.Add(HeaderNames.Authorization, $"Bearer {token}");
+            }
+            
             HttpResponseMessage response = await HttpClient.GetAsync(uri);
             response.EnsureSuccessStatusCode();
             return await response.Content.ReadAsAsync<HostStatus>();

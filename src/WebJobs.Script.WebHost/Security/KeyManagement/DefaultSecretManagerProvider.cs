@@ -74,64 +74,56 @@ namespace Microsoft.Azure.WebJobs.Script.WebHost
             Interlocked.Exchange(ref _secretManagerLazy, new Lazy<ISecretManager>(Create));
         }
 
-        private ISecretManager Create() => new SecretManager(CreateSecretsRepository(), _loggerFactory.CreateLogger<SecretManager>(), _metricsLogger, _hostNameProvider, _startupContextProvider);
+        private ISecretManager Create() => SecretsEnabled ? new SecretManager(CreateSecretsRepository(), _loggerFactory.CreateLogger<SecretManager>(), _metricsLogger, _hostNameProvider, _startupContextProvider) : null;
 
         internal ISecretsRepository CreateSecretsRepository()
         {
             ISecretsRepository repository = null;
+            var repositoryType = GetSecretsRepositoryType();
 
-            if (TryGetSecretsRepositoryType(out Type repositoryType))
+            if (repositoryType == typeof(FileSystemSecretsRepository))
             {
-                if (repositoryType == typeof(FileSystemSecretsRepository))
-                {
-                    repository = new FileSystemSecretsRepository(_options.CurrentValue.SecretsPath, _loggerFactory.CreateLogger<FileSystemSecretsRepository>(), _environment);
-                }
-                else if (repositoryType == typeof(KeyVaultSecretsRepository))
-                {
-                    string azureWebJobsSecretStorageKeyVaultName = Environment.GetEnvironmentVariable(EnvironmentSettingNames.AzureWebJobsSecretStorageKeyVaultName);
-                    string azureWebJobsSecretStorageKeyVaultConnectionString = Environment.GetEnvironmentVariable(EnvironmentSettingNames.AzureWebJobsSecretStorageKeyVaultConnectionString);
-
-                    repository = new KeyVaultSecretsRepository(Path.Combine(_options.CurrentValue.SecretsPath, "Sentinels"),
-                                                               azureWebJobsSecretStorageKeyVaultName,
-                                                               azureWebJobsSecretStorageKeyVaultConnectionString,
-                                                               _loggerFactory.CreateLogger<KeyVaultSecretsRepository>(),
-                                                               _environment);
-                }
-                else if (repositoryType == typeof(KubernetesSecretsRepository))
-                {
-                    repository = new KubernetesSecretsRepository(_environment, new SimpleKubernetesClient(_environment, _loggerFactory.CreateLogger<SimpleKubernetesClient>()));
-                }
-                else if (repositoryType == typeof(BlobStorageSasSecretsRepository))
-                {
-                    string secretStorageSas = _environment.GetEnvironmentVariable(EnvironmentSettingNames.AzureWebJobsSecretStorageSas);
-                    string siteSlotName = _environment.GetAzureWebsiteUniqueSlotName() ?? _hostIdProvider.GetHostIdAsync(CancellationToken.None).GetAwaiter().GetResult();
-                    repository = new BlobStorageSasSecretsRepository(Path.Combine(_options.CurrentValue.SecretsPath, "Sentinels"),
-                                                                     secretStorageSas,
-                                                                     siteSlotName,
-                                                                     _loggerFactory.CreateLogger<BlobStorageSasSecretsRepository>(),
-                                                                     _environment,
-                                                                     _azureStorageProvider);
-                }
-                else if (repositoryType == typeof(BlobStorageSecretsRepository))
-                {
-                    string siteSlotName = _environment.GetAzureWebsiteUniqueSlotName() ?? _hostIdProvider.GetHostIdAsync(CancellationToken.None).GetAwaiter().GetResult();
-                    repository = new BlobStorageSecretsRepository(Path.Combine(_options.CurrentValue.SecretsPath, "Sentinels"),
-                                                                  ConnectionStringNames.Storage,
-                                                                  siteSlotName,
-                                                                  _loggerFactory.CreateLogger<BlobStorageSecretsRepository>(),
-                                                                  _environment,
-                                                                  _azureStorageProvider);
-                }
+                repository = new FileSystemSecretsRepository(_options.CurrentValue.SecretsPath, _loggerFactory.CreateLogger<FileSystemSecretsRepository>(), _environment);
             }
-
-            if (repository == null)
+            else if (repositoryType == typeof(KeyVaultSecretsRepository))
             {
-                throw new InvalidOperationException($"Secret initialization from Blob storage failed due to missing both an Azure Storage connection string and a SAS connection uri. " +
-                    $"For Blob Storage, please provide at least one of these. If you intend to use files for secrets, add an App Setting key '{EnvironmentSettingNames.AzureWebJobsSecretStorageType}' with value '{FileStorage}'.");
+                string azureWebJobsSecretStorageKeyVaultName = Environment.GetEnvironmentVariable(EnvironmentSettingNames.AzureWebJobsSecretStorageKeyVaultName);
+                string azureWebJobsSecretStorageKeyVaultConnectionString = Environment.GetEnvironmentVariable(EnvironmentSettingNames.AzureWebJobsSecretStorageKeyVaultConnectionString);
+
+                repository = new KeyVaultSecretsRepository(Path.Combine(_options.CurrentValue.SecretsPath, "Sentinels"),
+                                                           azureWebJobsSecretStorageKeyVaultName,
+                                                           azureWebJobsSecretStorageKeyVaultConnectionString,
+                                                           _loggerFactory.CreateLogger<KeyVaultSecretsRepository>(),
+                                                           _environment);
+            }
+            else if (repositoryType == typeof(KubernetesSecretsRepository))
+            {
+                repository = new KubernetesSecretsRepository(_environment, new SimpleKubernetesClient(_environment, _loggerFactory.CreateLogger<SimpleKubernetesClient>()));
+            }
+            else if (repositoryType == typeof(BlobStorageSasSecretsRepository))
+            {
+                string secretStorageSas = _environment.GetEnvironmentVariable(EnvironmentSettingNames.AzureWebJobsSecretStorageSas);
+                string siteSlotName = _environment.GetAzureWebsiteUniqueSlotName() ?? _hostIdProvider.GetHostIdAsync(CancellationToken.None).GetAwaiter().GetResult();
+                repository = new BlobStorageSasSecretsRepository(Path.Combine(_options.CurrentValue.SecretsPath, "Sentinels"),
+                                                                 secretStorageSas,
+                                                                 siteSlotName,
+                                                                 _loggerFactory.CreateLogger<BlobStorageSasSecretsRepository>(),
+                                                                 _environment,
+                                                                 _azureStorageProvider);
+            }
+            else if (repositoryType == typeof(BlobStorageSecretsRepository))
+            {
+                string siteSlotName = _environment.GetAzureWebsiteUniqueSlotName() ?? _hostIdProvider.GetHostIdAsync(CancellationToken.None).GetAwaiter().GetResult();
+                repository = new BlobStorageSecretsRepository(Path.Combine(_options.CurrentValue.SecretsPath, "Sentinels"),
+                                                              ConnectionStringNames.Storage,
+                                                              siteSlotName,
+                                                              _loggerFactory.CreateLogger<BlobStorageSecretsRepository>(),
+                                                              _environment,
+                                                              _azureStorageProvider);
             }
 
             ILogger logger = _loggerFactory.CreateLogger<DefaultSecretManagerProvider>();
-            logger.LogInformation("Resolved secret storage provider {provider}", repository.Name);
+            logger.LogInformation("Resolved secret storage provider {provider}", repository?.Name);
 
             return repository;
         }
@@ -144,48 +136,41 @@ namespace Microsoft.Azure.WebJobs.Script.WebHost
         /// no storage connection string for default blob storage, etc.). Note that it's still possible for the creation of the repository
         /// to fail due to invalid values. This method just does preliminary config checks to determine the Type.
         /// </remarks>
-        /// <param name="repositoryType">The repository Type or null.</param>
-        /// <returns>True if a Type was determined, false otherwise.</returns>
-        internal bool TryGetSecretsRepositoryType(out Type repositoryType)
+        /// <returns>The repository Type; null if no storage provider determined.</returns>
+        internal Type GetSecretsRepositoryType()
         {
             string secretStorageType = Environment.GetEnvironmentVariable(EnvironmentSettingNames.AzureWebJobsSecretStorageType);
             string secretStorageSas = _environment.GetEnvironmentVariable(EnvironmentSettingNames.AzureWebJobsSecretStorageSas);
 
             if (secretStorageType != null && secretStorageType.Equals(FileStorage, StringComparison.OrdinalIgnoreCase))
             {
-                repositoryType = typeof(FileSystemSecretsRepository);
-                return true;
+                return typeof(FileSystemSecretsRepository);
             }
             else if (secretStorageType != null && secretStorageType.Equals("keyvault", StringComparison.OrdinalIgnoreCase))
             {
-                repositoryType = typeof(KeyVaultSecretsRepository);
-                return true;
+                return typeof(KeyVaultSecretsRepository);
             }
             else if (secretStorageType != null && secretStorageType.Equals("kubernetes", StringComparison.OrdinalIgnoreCase))
             {
-                repositoryType = typeof(KubernetesSecretsRepository);
-                return true;
+                return typeof(KubernetesSecretsRepository);
             }
             else if (secretStorageSas != null)
             {
-                repositoryType = typeof(BlobStorageSasSecretsRepository);
-                return true;
+                return typeof(BlobStorageSasSecretsRepository);
             }
             else if (_azureStorageProvider.ConnectionExists(ConnectionStringNames.Storage))
             {
-                repositoryType = typeof(BlobStorageSecretsRepository);
-                return true;
+                return typeof(BlobStorageSecretsRepository);
             }
             else
             {
-                repositoryType = null;
-                return false;
+                return null;
             }
         }
 
         internal bool GetSecretsEnabled()
         {
-            return TryGetSecretsRepositoryType(out _);
+            return GetSecretsRepositoryType() != null;
         }
     }
 }
