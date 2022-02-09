@@ -6,8 +6,10 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Azure.WebJobs.Script.Config;
 using Microsoft.Azure.WebJobs.Script.Workers;
 using Microsoft.Azure.WebJobs.Script.Workers.Rpc;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Microsoft.WebJobs.Script.Tests;
@@ -21,6 +23,8 @@ namespace Microsoft.Azure.WebJobs.Script.Tests.Workers
         private readonly TestLoggerProvider _loggerProvider;
         private readonly ILoggerFactory _loggerFactory;
         private readonly TestEnvironment _testEnvironment;
+        private readonly IScmHostingConfigurations _scmHostingConfigurations;
+        private readonly IApplicationLifetime _applicationLifetime;
 
         public WorkerConcurrencyManagerTest()
         {
@@ -30,6 +34,13 @@ namespace Microsoft.Azure.WebJobs.Script.Tests.Workers
             _testEnvironment = new TestEnvironment();
             _testEnvironment.SetEnvironmentVariable(RpcWorkerConstants.FunctionsWorkerDynamicConcurrencyEnabled, "true");
             _testEnvironment.SetEnvironmentVariable(RpcWorkerConstants.FunctionWorkerRuntimeSettingName, RpcWorkerConstants.PythonLanguageWorkerName);
+            _testEnvironment.SetEnvironmentVariable(EnvironmentSettingNames.FunctionWorkerRuntime, RpcWorkerConstants.NodeLanguageWorkerName);
+            Mock<IScmHostingConfigurations> conf = new Mock<IScmHostingConfigurations>();
+            conf.Setup(x => x.FunctionsWorkerDynamicConcurrencyEnabled).Returns(false);
+            _scmHostingConfigurations = conf.Object;
+            Mock<IApplicationLifetime> applicationLifetime = new Mock<IApplicationLifetime>();
+            applicationLifetime.Setup(x => x.StopApplication()).Verifiable();
+            _applicationLifetime = applicationLifetime.Object;
         }
 
         public static IEnumerable<object[]> DataForIsOverloaded =>
@@ -210,7 +221,8 @@ namespace Microsoft.Azure.WebJobs.Script.Tests.Workers
             Mock<IFunctionInvocationDispatcher> functionInvocationDispatcher = new Mock<IFunctionInvocationDispatcher>(MockBehavior.Strict);
             Mock<IFunctionInvocationDispatcherFactory> functionInvocationDispatcherFactory = new Mock<IFunctionInvocationDispatcherFactory>(MockBehavior.Strict);
             functionInvocationDispatcherFactory.Setup(x => x.GetFunctionDispatcher()).Returns(functionInvocationDispatcher.Object);
-            WorkerConcurrencyManager concurrancyManger = new WorkerConcurrencyManager(functionInvocationDispatcherFactory.Object, _testEnvironment, Options.Create(options), _loggerFactory);
+            WorkerConcurrencyManager concurrancyManger = new WorkerConcurrencyManager(functionInvocationDispatcherFactory.Object, _testEnvironment, Options.Create(options),
+                _scmHostingConfigurations, _applicationLifetime, _loggerFactory);
             await concurrancyManger.StartAsync(CancellationToken.None);
 
             await TestHelpers.Await(() =>
@@ -227,7 +239,8 @@ namespace Microsoft.Azure.WebJobs.Script.Tests.Workers
             Mock<IFunctionInvocationDispatcherFactory> functionInvocationDispatcherFactory = new Mock<IFunctionInvocationDispatcherFactory>(MockBehavior.Strict);
             functionInvocationDispatcherFactory.Setup(x => x.GetFunctionDispatcher()).Returns(functionInvocationDispatcher.Object);
             _testEnvironment.SetEnvironmentVariable(RpcWorkerConstants.FunctionsWorkerDynamicConcurrencyEnabled, "false");
-            WorkerConcurrencyManager concurrancyManger = new WorkerConcurrencyManager(functionInvocationDispatcherFactory.Object, _testEnvironment, Options.Create(new WorkerConcurrencyOptions()), _loggerFactory);
+            WorkerConcurrencyManager concurrancyManger = new WorkerConcurrencyManager(functionInvocationDispatcherFactory.Object, _testEnvironment,
+                Options.Create(new WorkerConcurrencyOptions()), _scmHostingConfigurations, _applicationLifetime, _loggerFactory);
             await concurrancyManger.StartAsync(CancellationToken.None);
 
             await Task.Delay(1000);
@@ -242,7 +255,8 @@ namespace Microsoft.Azure.WebJobs.Script.Tests.Workers
         {
             Mock<IFunctionInvocationDispatcherFactory> functionInvocationDispatcherFactory = new Mock<IFunctionInvocationDispatcherFactory>(MockBehavior.Strict);
             functionInvocationDispatcherFactory.Setup(x => x.GetFunctionDispatcher()).Returns(new HttpFunctionInvocationDispatcher());
-            WorkerConcurrencyManager concurrancyManger = new WorkerConcurrencyManager(functionInvocationDispatcherFactory.Object, _testEnvironment, Options.Create(new WorkerConcurrencyOptions()), _loggerFactory);
+            WorkerConcurrencyManager concurrancyManger = new WorkerConcurrencyManager(functionInvocationDispatcherFactory.Object, _testEnvironment,
+                Options.Create(new WorkerConcurrencyOptions()), _scmHostingConfigurations, _applicationLifetime, _loggerFactory);
             await concurrancyManger.StartAsync(CancellationToken.None);
 
             await Task.Delay(1000);
@@ -257,7 +271,8 @@ namespace Microsoft.Azure.WebJobs.Script.Tests.Workers
             Mock<IFunctionInvocationDispatcher> functionInvocationDispatcher = new Mock<IFunctionInvocationDispatcher>(MockBehavior.Strict);
             Mock<IFunctionInvocationDispatcherFactory> functionInvocationDispatcherFactory = new Mock<IFunctionInvocationDispatcherFactory>(MockBehavior.Strict);
             functionInvocationDispatcherFactory.Setup(x => x.GetFunctionDispatcher()).Returns(functionInvocationDispatcher.Object);
-            WorkerConcurrencyManager concurrancyManger = new WorkerConcurrencyManager(functionInvocationDispatcherFactory.Object, _testEnvironment, Options.Create(options), _loggerFactory);
+            WorkerConcurrencyManager concurrancyManger = new WorkerConcurrencyManager(functionInvocationDispatcherFactory.Object, _testEnvironment, Options.Create(options),
+                _scmHostingConfigurations, _applicationLifetime, _loggerFactory);
             await concurrancyManger.StartAsync(CancellationToken.None);
 
             WorkerStatus status = new WorkerStatus()
@@ -291,11 +306,61 @@ namespace Microsoft.Azure.WebJobs.Script.Tests.Workers
                 LatencyHistory = latencies2.Select(x => TimeSpan.FromMilliseconds(x))
             });
 
-            WorkerConcurrencyManager concurrancyManager = new WorkerConcurrencyManager(functionInvocationDispatcherFactory.Object, _testEnvironment, Options.Create(options), _loggerFactory);
+            WorkerConcurrencyManager concurrancyManager = new WorkerConcurrencyManager(functionInvocationDispatcherFactory.Object, _testEnvironment, Options.Create(options),
+                _scmHostingConfigurations, _applicationLifetime, _loggerFactory);
             await concurrancyManager.StartAsync(CancellationToken.None);
             bool value = concurrancyManager.NewWorkerIsRequired(workerStatuses, elapsedFromLastAdding);
 
             Assert.Equal(value, expected);
+        }
+
+        [Theory]
+        [InlineData(RpcWorkerConstants.JavaLanguageWorkerName)]
+        public async Task StartAsync_DoesNotGetDispatcher(string workerRuntime)
+        {
+            _testEnvironment.SetEnvironmentVariable(EnvironmentSettingNames.FunctionWorkerRuntime, workerRuntime);
+            Mock<IFunctionInvocationDispatcherFactory> functionInvocationDispatcherFactory = new Mock<IFunctionInvocationDispatcherFactory>(MockBehavior.Strict);
+            WorkerConcurrencyManager concurrancyManager = new WorkerConcurrencyManager(functionInvocationDispatcherFactory.Object, _testEnvironment, Options.Create(new WorkerConcurrencyOptions()),
+                _scmHostingConfigurations, _applicationLifetime, _loggerFactory);
+            await concurrancyManager.StartAsync(CancellationToken.None);
+        }
+
+        [Theory]
+        [InlineData(RpcWorkerConstants.NodeLanguageWorkerName)]
+        [InlineData(RpcWorkerConstants.PowerShellLanguageWorkerName)]
+        [InlineData(RpcWorkerConstants.PythonLanguageWorkerName)]
+        public async Task StartAsync_GetsDispatcher(string workerRuntime)
+        {
+            _testEnvironment.SetEnvironmentVariable(EnvironmentSettingNames.FunctionWorkerRuntime, workerRuntime);
+            Mock<IFunctionInvocationDispatcher> functionInvocationDispatcher = new Mock<IFunctionInvocationDispatcher>(MockBehavior.Strict);
+            Mock<IFunctionInvocationDispatcherFactory> functionInvocationDispatcherFactory = new Mock<IFunctionInvocationDispatcherFactory>(MockBehavior.Strict);
+            functionInvocationDispatcherFactory.Setup(x => x.GetFunctionDispatcher()).Returns(functionInvocationDispatcher.Object);
+
+            WorkerConcurrencyManager concurrancyManager = new WorkerConcurrencyManager(functionInvocationDispatcherFactory.Object, _testEnvironment, Options.Create(new WorkerConcurrencyOptions()),
+                _scmHostingConfigurations, _applicationLifetime, _loggerFactory);
+            await concurrancyManager.StartAsync(CancellationToken.None);
+        }
+
+        [Fact]
+        public async Task ActivateWorkerConcurency_ScmHostingConfiguration_WorkAsExpected()
+        {
+            TestEnvironment testEnvironment = new TestEnvironment();
+            testEnvironment.SetEnvironmentVariable(EnvironmentSettingNames.FunctionWorkerRuntime, RpcWorkerConstants.NodeLanguageWorkerName);
+            Mock<IFunctionInvocationDispatcher> functionInvocationDispatcher = new Mock<IFunctionInvocationDispatcher>(MockBehavior.Strict);
+            Mock<IFunctionInvocationDispatcherFactory> functionInvocationDispatcherFactory = new Mock<IFunctionInvocationDispatcherFactory>(MockBehavior.Strict);
+            functionInvocationDispatcherFactory.Setup(x => x.GetFunctionDispatcher()).Returns(functionInvocationDispatcher.Object);
+            Mock<IScmHostingConfigurations> conf = new Mock<IScmHostingConfigurations>();
+            conf.Setup(x => x.FunctionsWorkerDynamicConcurrencyEnabled).Returns(true);
+            WorkerConcurrencyOptions options = new WorkerConcurrencyOptions();
+
+            WorkerConcurrencyManager concurrancyManager = new WorkerConcurrencyManager(functionInvocationDispatcherFactory.Object, testEnvironment, Options.Create(options), conf.Object, _applicationLifetime, _loggerFactory);
+            concurrancyManager.ActivationTimerInterval = TimeSpan.FromMilliseconds(100);
+            await concurrancyManager.StartAsync(CancellationToken.None);
+            await Task.Delay(1000);
+            Assert.Single(_loggerProvider.GetAllLogMessages().Where(x => x.FormattedMessage.StartsWith("Dynamic worker concurrency monitoring was started by activation timer.")));
+            conf.Setup(x => x.FunctionsWorkerDynamicConcurrencyEnabled).Returns(false);
+            await Task.Delay(1000);
+            Assert.Single(_loggerProvider.GetAllLogMessages().Where(x => x.FormattedMessage.StartsWith("Dynamic worker concurrency monitoring is disabled after activation. Shutting down Functions Host.")));
         }
     }
 }

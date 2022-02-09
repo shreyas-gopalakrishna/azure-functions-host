@@ -287,6 +287,7 @@ namespace Microsoft.Azure.WebJobs.Script
                          .GetSection(ConfigurationSectionNames.Scale)
                          .Bind(o);
                     });
+                services.AddSingleton<IScmHostingConfigurations>();
 
                 services.AddSingleton<IFileLoggingStatusManager, FileLoggingStatusManager>();
 
