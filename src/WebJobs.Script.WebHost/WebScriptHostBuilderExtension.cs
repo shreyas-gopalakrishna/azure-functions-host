@@ -152,6 +152,12 @@ namespace Microsoft.Azure.WebJobs.Script.WebHost
                     services.AddSingleton<IFileMonitoringService, FileMonitoringService>();
                     services.TryAddEnumerable(ServiceDescriptor.Singleton<IHostedService, IFileMonitoringService>(p => p.GetService<IFileMonitoringService>()));
 
+                    IHostJsonConfigProvider hostJsonConfigProvider = rootServiceProvider.GetService<IHostJsonConfigProvider>();
+                    if (hostJsonConfigProvider != null)
+                    {
+                        hostJsonConfigProvider.RegisterOptionTypes(services);
+                    }
+
                     ConfigureRegisteredBuilders(services, rootServiceProvider);
                 });
 

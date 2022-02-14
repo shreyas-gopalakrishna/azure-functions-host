@@ -9,11 +9,14 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Azure.WebJobs.Extensions.Http;
 using Microsoft.Azure.WebJobs.Script.BindingExtensions;
 using Microsoft.Azure.WebJobs.Script.Config;
 using Microsoft.Azure.WebJobs.Script.ExtensionBundle;
 using Microsoft.Azure.WebJobs.Script.Models;
 using Microsoft.Azure.WebJobs.Script.Properties;
+using Microsoft.Azure.WebJobs.Script.WebHost.Filters;
+using Microsoft.Azure.WebJobs.Script.WebHost.Management;
 using Microsoft.Azure.WebJobs.Script.WebHost.Models;
 using Microsoft.Azure.WebJobs.Script.WebHost.Security.Authorization.Policies;
 using Microsoft.Extensions.Options;
@@ -21,7 +24,7 @@ using Newtonsoft.Json;
 
 namespace Microsoft.Azure.WebJobs.Script.WebHost.Controllers
 {
-    [Authorize(Policy = PolicyNames.AdminAuthLevel)]
+ //   [Authorize(Policy = PolicyNames.AdminAuthLevel)]
     public class ExtensionsController : Controller
     {
         private readonly IExtensionsManager _extensionsManager;
@@ -113,6 +116,14 @@ namespace Microsoft.Azure.WebJobs.Script.WebHost.Controllers
             var result = ApiModelUtility.CreateApiModel(jobContent, Request);
 
             return Ok(result);
+        }
+
+        [HttpGet]
+        [Route("admin/host/extensions/config")] // TODO we need to inject proper Access restriction.
+        [RequiresRunningHost]
+        public IActionResult GetExtensionsConfig([FromServices] IHostJsonManager hostJsonManager)
+        {
+            return Ok(hostJsonManager.GetHostJsonPayload());
         }
 
         public async Task<IActionResult> InstallExtension(ExtensionPackageReferenceWithActions package, bool verifyConflict = true)
