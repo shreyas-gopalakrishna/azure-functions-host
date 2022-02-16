@@ -23,7 +23,7 @@ namespace Microsoft.Azure.WebJobs.Script.WebHost.Extensions
             return camelObj;
         }
 
-        private static string CamelCaseString(this string str)
+        public static string CamelCaseString(this string str)
         {
             if (str != null)
             {

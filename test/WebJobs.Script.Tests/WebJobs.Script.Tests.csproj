@@ -115,6 +115,18 @@
     <None Update="Microsoft.Azure.WebJobs.Script.WebHost.deps.json">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
+    <None Update="TestFixture\HostJsonConfigProviderTests\TestBasicBindings.json">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Update="TestFixture\HostJsonConfigProviderTests\TestBasicConcurrency.json">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Update="TestFixture\HostJsonConfigProviderTests\TestDefaultConcurrency.json">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Update="TestFixture\HostJsonConfigProviderTests\TestModifiedBindings.json">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
     <None Update="Workers\Rpc\Resources\functions.png">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>

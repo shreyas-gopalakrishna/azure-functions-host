@@ -24,7 +24,7 @@ using Newtonsoft.Json;
 
 namespace Microsoft.Azure.WebJobs.Script.WebHost.Controllers
 {
- //   [Authorize(Policy = PolicyNames.AdminAuthLevel)]
+    [Authorize(Policy = PolicyNames.AdminAuthLevel)]
     public class ExtensionsController : Controller
     {
         private readonly IExtensionsManager _extensionsManager;
@@ -119,7 +119,7 @@ namespace Microsoft.Azure.WebJobs.Script.WebHost.Controllers
         }
 
         [HttpGet]
-        [Route("admin/host/extensions/config")] // TODO we need to inject proper Access restriction.
+        [Route("admin/host/extensions/config")]
         [RequiresRunningHost]
         public IActionResult GetExtensionsConfig([FromServices] IHostJsonManager hostJsonManager)
         {

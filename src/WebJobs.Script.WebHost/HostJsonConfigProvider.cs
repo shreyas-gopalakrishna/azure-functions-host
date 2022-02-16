@@ -32,7 +32,6 @@ namespace Microsoft.Azure.WebJobs.Script.WebHost
         private List<Type> _extensionOptionTypes;
         private IScriptHostManager _scriptHostManager;
         private bool _disposedValue;
-        private List<string> _extensionConfigSectionNames;
 
         public HostJsonConfigProvider(IScriptHostManager scriptHostManager)
         {
@@ -48,25 +47,6 @@ namespace Microsoft.Azure.WebJobs.Script.WebHost
         {
             var extensionOptions = services.Where(p => p.ServiceType.IsGenericType && p.ServiceType.GetGenericTypeDefinition() == typeof(IConfigureOptions<>) && p.ImplementationFactory != null && p.ImplementationFactory.Target.ToString().StartsWith(typeof(WebJobsExtensionBuilderExtensions).FullName)).ToList();
             _extensionOptionTypes = extensionOptions.Select(p => p.ServiceType.GetGenericArguments()[0]).ToList();
-            SetUpExtensionConfigSectionNames(services);
-        }
-
-        private void SetUpExtensionConfigSectionNames(IServiceCollection services)
-        {
-            _extensionConfigSectionNames = new List<string>();
-            var extensionConfigProviders = services.Where(p => p.ServiceType.IsAssignableFrom(typeof(IExtensionConfigProvider)));
-            MethodInfo fromExtensionGenericMethod = typeof(ExtensionInfo).GetMethod(nameof(ExtensionInfo.FromExtension));
-            foreach (var extension in extensionConfigProviders)
-            {
-                // TODO - will we always have an implementation Type here?
-                if (extension.ImplementationType != null)
-                {
-                    MethodInfo fromExtensionMethod = fromExtensionGenericMethod.MakeGenericMethod(extension.ImplementationType);
-                    ExtensionInfo extensionInfo = (ExtensionInfo)fromExtensionMethod.Invoke(null, null);
-                    // TODO: camel case
-                    _extensionConfigSectionNames.Add(extensionInfo.ConfigurationSectionName);
-                }
-            }
         }
 
         private void ActiveHostChanged(object sender, ActiveHostChangedEventArgs e)
@@ -94,10 +74,13 @@ namespace Microsoft.Azure.WebJobs.Script.WebHost
                 // create the instance - this will cause configuration binding
                 object options = valueProperty.GetValue(optionsWrapper);
 
-                // format extension name based on convention from options name
-                // TODO: format this properly
-                int idx = optionsType.Name.LastIndexOf("Options");
-                string name = optionsType.Name.Substring(0, 1).ToLower() + optionsType.Name.Substring(1, idx - 1);
+                // get the section name from Extension attribute of IExtensionConfigProvider class
+                Type webJobsExtensionOptionsConfigurationType = typeof(IWebJobsExtensionOptionsConfiguration<>).MakeGenericType(optionsType);
+                var webJobsExtensionOptionsConfiguration = serviceProvider.GetService(webJobsExtensionOptionsConfigurationType);
+                PropertyInfo sectionName = webJobsExtensionOptionsConfigurationType.GetProperty("ExtensionInfo");
+                IExtensionInfo info = (IExtensionInfo)sectionName.GetValue(webJobsExtensionOptionsConfiguration);
+
+                string name = info.ConfigurationSectionName.CamelCaseString();
 
                 IOptionsFormatter optionsFormatter = options as IOptionsFormatter;
                 if (optionsFormatter != null)
@@ -118,32 +101,6 @@ namespace Microsoft.Azure.WebJobs.Script.WebHost
             }
 
             return result;
-        }
-
-        private string GetExtensionConfigSectionName(string candidateName)
-        {
-            if (_extensionConfigSectionNames.Contains(candidateName))
-            {
-                return candidateName;
-            }
-
-            foreach (var sectionName in _extensionConfigSectionNames)
-            {
-                // TODO PluralizationService is not implemented on .NET only on .NET Framework.
-                // For the current extensions, this implementation is ok.
-
-                // candidate is plural but sectionName is not plural
-                if (string.Equals($"{sectionName}s", candidateName))
-                {
-                    return sectionName;
-                }
-                // candidate is sigular but sectionName is plural
-                if (string.Equals(sectionName, $"{candidateName}s"))
-                {
-                    return sectionName;
-                }
-            }
-            return candidateName;
         }
 
         public JObject GetConcurrencyOption(IServiceProvider serviceProvider)
