@@ -115,16 +115,25 @@
     <None Update="Microsoft.Azure.WebJobs.Script.WebHost.deps.json">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
-    <None Update="TestFixture\HostJsonConfigProviderTests\TestBasicBindings.json">
+    <None Update="TestFixture\HostOptionProviderTests\TestBasicBindings.json">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
-    <None Update="TestFixture\HostJsonConfigProviderTests\TestBasicConcurrency.json">
+    <None Update="TestFixture\HostOptionProviderTests\TestBasicConcurrency.json">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
-    <None Update="TestFixture\HostJsonConfigProviderTests\TestDefaultConcurrency.json">
+    <None Update="TestFixture\HostOptionProviderTests\TestDefaultConcurrency.json">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
-    <None Update="TestFixture\HostJsonConfigProviderTests\TestModifiedBindings.json">
+    <None Update="TestFixture\HostOptionProviderTests\TestIrregularNamingBindings.json">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Update="TestFixture\HostOptionProviderTests\TestMultipleBindings.json">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Update="TestFixture\HostOptionProviderTests\TestWihtoutExtensionsAttributeBindings.json">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Update="TestFixture\HostOptionProviderTests\TestWihtoutIOptionsFormatter.json">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
     <None Update="Workers\Rpc\Resources\functions.png">

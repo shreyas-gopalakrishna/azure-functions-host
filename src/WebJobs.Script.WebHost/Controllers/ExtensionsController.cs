@@ -118,14 +118,6 @@ namespace Microsoft.Azure.WebJobs.Script.WebHost.Controllers
             return Ok(result);
         }
 
-        [HttpGet]
-        [Route("admin/host/extensions/config")]
-        [RequiresRunningHost]
-        public IActionResult GetExtensionsConfig([FromServices] IHostJsonManager hostJsonManager)
-        {
-            return Ok(hostJsonManager.GetHostJsonPayload());
-        }
-
         public async Task<IActionResult> InstallExtension(ExtensionPackageReferenceWithActions package, bool verifyConflict = true)
         {
             if (package == null)

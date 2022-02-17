@@ -5,14 +5,10 @@ using System.Collections.Generic;
 using Microsoft.Extensions.DependencyInjection;
 using Newtonsoft.Json.Linq;
 
-namespace Microsoft.Azure.WebJobs.Script.WebHost
+namespace Microsoft.Azure.WebJobs.Script
 {
-    public interface IHostJsonConfigProvider
+    public interface IHostOptionsProvider
     {
-        Dictionary<string, JObject> ExtensionOptions { get; }
-
-        JObject ConcurrencyOption { get; }
-
-        void RegisterOptionTypes(IServiceCollection services);
+        string GetPayload();
     }
 }

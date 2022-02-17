@@ -395,5 +395,21 @@ namespace Microsoft.Azure.WebJobs.Script.WebHost.Controllers
 
             return NotFound();
         }
+
+        [HttpGet]
+        [Route("admin/host/config")]
+        [Authorize(Policy = PolicyNames.AdminAuthLevelOrInternal)]
+        [RequiresRunningHost]
+        public IActionResult GetExtensionsConfig([FromServices] IScriptHostManager scriptHostManager)
+        {
+            if (Utility.TryGetHostService(scriptHostManager, out IHostOptionsProvider provider))
+            {
+                return Ok(provider.GetPayload());
+            }
+            else
+            {
+                return StatusCode(StatusCodes.Status503ServiceUnavailable);
+            }
+        }
     }
 }

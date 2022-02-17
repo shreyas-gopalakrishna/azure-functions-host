@@ -1,6 +1,0 @@
-{
-  "dynamicConcurrencyEnabled": true,
-  "maximumFunctionConcurrency": 20,
-  "cpuThreshold": 0.8,
-  "snapshotPersistenceEnabled": true
-}

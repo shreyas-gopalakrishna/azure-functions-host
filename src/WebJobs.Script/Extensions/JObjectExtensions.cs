@@ -5,7 +5,7 @@ using System.Linq;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Newtonsoft.Json.Linq;
 
-namespace Microsoft.Azure.WebJobs.Script.WebHost.Extensions
+namespace Microsoft.Azure.WebJobs.Script.Extensions
 {
     public static class JObjectExtensions
     {
