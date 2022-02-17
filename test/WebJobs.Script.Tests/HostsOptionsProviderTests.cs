@@ -15,7 +15,7 @@ using Xunit;
 
 namespace Microsoft.Azure.WebJobs.Script.Tests
 {
-    public class HostOptionProviderTests
+    public class HostsOptionsProviderTests
     {
         [Fact]
         public void OverwriteWithAppSettings_Success()
@@ -153,7 +153,7 @@ namespace Microsoft.Azure.WebJobs.Script.Tests
 
         public static string ReadFixture(string name)
         {
-            var path = Path.Combine("TestFixture", "HostOptionProviderTests", name);
+            var path = Path.Combine("TestFixture", "HostOptionsProviderTests", name);
             return File.ReadAllText(path);
         }
 
