@@ -27,12 +27,12 @@ namespace Microsoft.Azure.WebJobs.Script
             ContractResolver = new CamelCasePropertyNamesContractResolver(),
         });
 
-        private readonly IEnumerable<IWebJobsExtensionOptionsConfiguration> _extensionOptionsConfigurations;
+        private readonly IEnumerable<IExtensionOptionsInfo> _extensionOptionsConfigurations;
         private readonly IServiceProvider _serviceProvider;
         private readonly ILogger<HostOptionsProvider> _logger;
         private readonly IOptionsMonitor<ConcurrencyOptions> _concurrencyOptions;
 
-        public HostOptionsProvider(IServiceProvider provider, IEnumerable<IWebJobsExtensionOptionsConfiguration> extensionOptionsConfigurations, IOptionsMonitor<ConcurrencyOptions> concurrencyOption, ILogger<HostOptionsProvider> logger)
+        public HostOptionsProvider(IServiceProvider provider, IEnumerable<IExtensionOptionsInfo> extensionOptionsConfigurations, IOptionsMonitor<ConcurrencyOptions> concurrencyOption, ILogger<HostOptionsProvider> logger)
         {
             _extensionOptionsConfigurations = extensionOptionsConfigurations;
             _serviceProvider = provider;
@@ -65,7 +65,7 @@ namespace Microsoft.Azure.WebJobs.Script
             // for each of the extension options types identified, create a bound instance
             // and format to JObject
             Dictionary<string, JObject> result = new Dictionary<string, JObject>();
-            foreach (IWebJobsExtensionOptionsConfiguration extensionOptionsConfiguration in _extensionOptionsConfigurations)
+            foreach (IExtensionOptionsInfo extensionOptionsConfiguration in _extensionOptionsConfigurations)
             {
                 // create the IOptions<T> type
                 Type optionsWrapperType = typeof(IOptions<>).MakeGenericType(extensionOptionsConfiguration.OptionType);
