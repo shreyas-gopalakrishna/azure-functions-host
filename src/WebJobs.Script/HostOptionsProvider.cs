@@ -22,13 +22,10 @@ namespace Microsoft.Azure.WebJobs.Script
 {
     public class HostOptionsProvider : IHostOptionsProvider
     {
-        private readonly JsonSerializerSettings _concurrencySettings = new JsonSerializerSettings
+        private readonly JsonSerializer _serializer = JsonSerializer.Create(new JsonSerializerSettings
         {
-            ContractResolver = new DefaultContractResolver
-            {
-                NamingStrategy = new CamelCaseNamingStrategy()
-            }
-        };
+            ContractResolver = new CamelCasePropertyNamesContractResolver(),
+        });
 
         private readonly IEnumerable<IWebJobsExtensionOptionsConfiguration> _extensionOptionsConfigurations;
         private readonly IServiceProvider _serviceProvider;
@@ -57,7 +54,7 @@ namespace Microsoft.Azure.WebJobs.Script
                 payload.Add("extensions", extensions);
             }
 
-            var concurrency = GetConcurrencyOption();
+            var concurrency = GetConcurrencyOptions();
             payload.Add("concurrency", concurrency);
             return payload.ToString();
         }
@@ -68,39 +65,36 @@ namespace Microsoft.Azure.WebJobs.Script
             // for each of the extension options types identified, create a bound instance
             // and format to JObject
             Dictionary<string, JObject> result = new Dictionary<string, JObject>();
-            foreach (IWebJobsExtensionOptionsConfiguration extensionOptionsConfigration in _extensionOptionsConfigurations)
+            foreach (IWebJobsExtensionOptionsConfiguration extensionOptionsConfiguration in _extensionOptionsConfigurations)
             {
                 // create the IOptions<T> type
-                Type optionsWrapperType = typeof(IOptions<>).MakeGenericType(extensionOptionsConfigration.OptionType);
+                Type optionsWrapperType = typeof(IOptions<>).MakeGenericType(extensionOptionsConfiguration.OptionType);
                 object optionsWrapper = _serviceProvider.GetService(optionsWrapperType);
-                PropertyInfo valueProperty = optionsWrapperType.GetProperty("Value");
-
-                // create the instance - this will cause configuration binding
-                object options = valueProperty.GetValue(optionsWrapper);
-
-                // get the section name from Extension attribute of IExtensionConfigProvider class
-                string name = extensionOptionsConfigration.ExtensionInfo.ConfigurationSectionName.CamelCaseString();
-
-                IOptionsFormatter optionsFormatter = options as IOptionsFormatter;
-                if (optionsFormatter != null)
+                if (optionsWrapper != null)
                 {
-                    result.Add(name, JObject.Parse(optionsFormatter.Format()).ToCamelCase());
-                }
-                else
-                {
-                    // We don't support the extensions that doesn't implement IOptionsFormatter.
-                    _logger.LogInformation($"{extensionOptionsConfigration.OptionType} doesn't support IOptionsFormatter. Ignored.");
+                    PropertyInfo valueProperty = optionsWrapperType.GetProperty("Value");
+
+                    // create the instance - this will cause configuration binding
+                    object options = valueProperty.GetValue(optionsWrapper);
+
+                    // get the section name from Extension attribute of IExtensionConfigProvider class
+                    string name = extensionOptionsConfiguration.ExtensionInfo.ConfigurationSectionName.CamelCaseString();
+
+                    IOptionsFormatter optionsFormatter = options as IOptionsFormatter;
+                    if (optionsFormatter != null)
+                    {
+                        result.Add(name, JObject.Parse(optionsFormatter.Format()).ToCamelCase());
+                    }
                 }
             }
 
             return result;
         }
 
-        private JObject GetConcurrencyOption()
+        private JObject GetConcurrencyOptions()
         {
-            var concurrencyOption = _concurrencyOptions.CurrentValue;
-            var json = JsonConvert.SerializeObject(concurrencyOption, _concurrencySettings);
-            return JObject.Parse(json);
+            var concurrencyOptions = _concurrencyOptions.CurrentValue;
+            return JObject.FromObject(concurrencyOptions, _serializer);
         }
     }
 }

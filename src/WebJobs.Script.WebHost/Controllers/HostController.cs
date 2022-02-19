@@ -400,7 +400,7 @@ namespace Microsoft.Azure.WebJobs.Script.WebHost.Controllers
         [Route("admin/host/config")]
         [Authorize(Policy = PolicyNames.AdminAuthLevelOrInternal)]
         [RequiresRunningHost]
-        public IActionResult GetExtensionsConfig([FromServices] IScriptHostManager scriptHostManager)
+        public IActionResult GetConfig([FromServices] IScriptHostManager scriptHostManager)
         {
             if (Utility.TryGetHostService(scriptHostManager, out IHostOptionsProvider provider))
             {
